@@ -6,9 +6,14 @@
 'use strict';
 
 /* ─── CONFIG ──────────────────────────────────────────────── */
-const API_BASE = (window.location.protocol.startsWith('http') && window.location.port === '3000')
-  ? '/api'
-  : 'http://localhost:3000/api';
+const metaBackendUrl = document.querySelector('meta[name="backend-api-url"]')?.getAttribute('content')?.trim();
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+const API_BASE = window.__API_BASE__
+  || (metaBackendUrl ? metaBackendUrl.replace(/\/$/, '') : null)
+  || (isLocalhost
+    ? (window.location.port === '3000' ? '/api' : 'http://localhost:3000/api')
+    : '/api');
 
 let cachedProjects = [];
 

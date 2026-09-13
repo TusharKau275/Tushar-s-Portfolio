@@ -1,0 +1,40 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/assets/:match*",
+      "destination": "/Frontend/assets/:match*"
+    },
+    {
+      "source": "/style.css",
+      "destination": "/Frontend/style.css"
+    },
+    {
+      "source": "/main.js",
+      "destination": "/Frontend/main.js"
+    },
+    {
+      "source": "/",
+      "destination": "/Frontend/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ]
+}

@@ -1,16 +1,46 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5500',
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      process.env.NODE_ENV !== 'production'
+    ) {
+      return callback(null, true);
+    }
+    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, '../Frontend')));
+// Serve static frontend files if present
+const frontendDir = path.join(__dirname, '../Frontend');
+const hasFrontend = fs.existsSync(path.join(frontendDir, 'index.html'));
+if (hasFrontend) {
+  app.use(express.static(frontendDir));
+}
 
 // ─── Portfolio Data API ────────────────────────────────────────────────────────
 const portfolioData = {
@@ -125,7 +155,16 @@ const portfolioData = {
   ]
 };
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// ─── Health Check & API Routes ───────────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    service: 'tushar-portfolio-backend'
+  });
+});
+
 app.get('/api/portfolio', (req, res) => {
   res.json({ success: true, data: portfolioData });
 });
@@ -142,12 +181,25 @@ app.get('/api/certifications', (req, res) => {
   res.json({ success: true, data: portfolioData.certifications });
 });
 
-// Fallback: serve index.html for any non-API route
-app.get('/{*path}', (req, res) => {
-  res.sendFile(path.join(__dirname, '../Frontend/index.html'));
+// Fallback: serve index.html if frontend directory exists, otherwise show API info
+app.use((req, res) => {
+  if (hasFrontend) {
+    res.sendFile(path.join(frontendDir, 'index.html'));
+  } else {
+    res.status(200).json({
+      message: "Tushar Kaushik's Portfolio API is live",
+      endpoints: {
+        health: '/api/health',
+        portfolio: '/api/portfolio',
+        skills: '/api/skills',
+        projects: '/api/projects',
+        certifications: '/api/certifications'
+      }
+    });
+  }
 });
 
 // ─── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🚀 Tushar's Portfolio Server running at http://localhost:${PORT}\n`);
+  console.log(`\n🚀 Tushar's Portfolio Server running on port ${PORT}\n`);
 });
