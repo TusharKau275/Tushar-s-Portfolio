@@ -110,50 +110,168 @@ const portfolioData = {
           { layer: "Containerization", tech: "Docker", purpose: "Production containers for AI + Backend" }
         ]
       }
-    },
-    {
-      id: 2,
-      title: 'Project Beta',
-      description: ' NOT UPDATED YET',
-      tech: [],
-      github: '',
-      live: null,
-      featured: true
-    },
-    {
-      id: 3,
-      title: 'Project Gamma',
-      description: ' NOT UPDATED YET',
-      tech: [],
-      github: '',
-      live: null,
-      featured: true
     }
   ],
   certifications: [
     {
       id: 1,
-      title: 'IICT AI AND ML Certification',
-      issuer: 'IICT',
-      year: '2026',
-      icon: 'gcp'
+      title: 'AI-ML Training',
+      issuer: 'Indian institute of computing and technology',
+      year: 'Issued Jul 2026',
+      credentialId: '',
+      credentialName: 'IICT AIML Training certificate',
+      skills: 'Python (Programming Language), Machine Learning',
+      icon: 'python'
     },
     {
       id: 2,
-      title: 'AWS Solutions Architect',
-      issuer: 'Amazon Web Services',
-      year: '2023',
-      icon: 'aws'
-    },
-    {
-      id: 3,
-      title: 'Node.js Application Developer',
-      issuer: 'OpenJS Foundation',
-      year: '2023',
-      icon: 'nodejs'
+      title: 'CS107: C++ Programming',
+      issuer: 'Saylor University',
+      year: 'Issued Jan 2026',
+      credentialId: '4289665260TK',
+      credentialName: 'C++ skill certificate.pdf',
+      skills: 'C++',
+      icon: 'cplusplus'
     }
   ]
 };
+
+// ─── Real-Time GitHub Integration & In-Memory Cache ─────────────────────────
+const GITHUB_USERNAME = 'TusharKau275';
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+let githubCache = {
+  timestamp: 0,
+  user: null,
+  repos: null,
+};
+
+async function fetchGitHubData() {
+  const now = Date.now();
+  if (githubCache.user && (now - githubCache.timestamp < CACHE_TTL_MS)) {
+    return githubCache;
+  }
+
+  try {
+    const headers = {
+      'User-Agent': 'Tushar-Portfolio-Server',
+      'Accept': 'application/vnd.github.v3+json',
+    };
+    if (process.env.GITHUB_TOKEN) {
+      headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+    }
+
+    const [userRes, reposRes] = await Promise.all([
+      fetch(`https://api.github.com/users/${GITHUB_USERNAME}`, { headers }),
+      fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=100`, { headers })
+    ]);
+
+    if (userRes.ok) {
+      githubCache.user = await userRes.json();
+    }
+    if (reposRes.ok) {
+      githubCache.repos = await reposRes.json();
+    }
+    githubCache.timestamp = now;
+  } catch (err) {
+    console.warn('GitHub API fetch error, using cached/bundled data:', err.message);
+  }
+
+  return githubCache;
+}
+
+async function getLivePortfolio() {
+  const gh = await fetchGitHubData();
+  const u = gh.user || {};
+  const repos = gh.repos || [];
+
+  const heatwaveRepo = repos.find(r => r.name === 'HEATWAVE-PROJECT');
+  const fakeNewsRepo = repos.find(r => r.name === 'FAKE-NEWS-DETECTION-ML-PROJECT');
+  const sietRepo = repos.find(r => r.name === 'SIET_COLLEGE_WEBSITE');
+  const portfolioRepo = repos.find(r => r.name === 'Tushar-s-Portfolio');
+
+  const liveProjects = [
+    {
+      id: 1,
+      name: 'HEATWAVE-PROJECT',
+      title: 'Aarogya — Urban Heatwave Early Warning & Monitoring System',
+      subtitle: 'Ward-level heat vulnerability indexing, ML-powered risk prediction, targeted multi-channel alerts, and real-time monitoring for Jaipur, India.',
+      description: 'Ward-level heat vulnerability indexing, ML-powered risk prediction, targeted multi-channel alerts, and real-time monitoring for Jaipur, India. Integrates Google Earth Engine satellite LST, 72h Open-Meteo forecasts, XGBoost ML pipeline, and automated Twilio SMS alert dispatch.',
+      tech: ['Python', 'FastAPI', 'XGBoost', 'Google Earth Engine', 'React 18', 'Express.js', 'MongoDB', 'Twilio SMS', 'Leaflet', 'Docker'],
+      github: heatwaveRepo?.html_url || 'https://github.com/TusharKau275/HEATWAVE-PROJECT',
+      live: 'https://heatwave-project-2.onrender.com/',
+      image: 'assets/aarogya-preview.png',
+      badge: 'FLAGSHIP · LIVE SYSTEM',
+      stars: heatwaveRepo?.stargazers_count ?? 0,
+      forks: heatwaveRepo?.forks_count ?? 2,
+      featured: true,
+      details: portfolioData.projects[0].details
+    },
+    {
+      id: 2,
+      name: 'FAKE-NEWS-DETECTION-ML-PROJECT',
+      title: 'Fake News Detection — Machine Learning NLP Classifier',
+      subtitle: 'Natural Language Processing and supervised classification pipeline for real-time disinformation filtering.',
+      description: 'Supervised NLP pipeline in Python utilizing TF-IDF vectorization and machine learning classifiers to detect, evaluate, and categorize fraudulent news articles and web propaganda.',
+      tech: ['Python', 'Scikit-Learn', 'NLP', 'Pandas', 'NumPy', 'TF-IDF'],
+      github: fakeNewsRepo?.html_url || 'https://github.com/TusharKau275/FAKE-NEWS-DETECTION-ML-PROJECT',
+      live: null,
+      badge: 'AI / ML PROJECT',
+      stars: fakeNewsRepo?.stargazers_count ?? 0,
+      forks: fakeNewsRepo?.forks_count ?? 0,
+      featured: true
+    },
+    {
+      id: 3,
+      name: 'SIET_COLLEGE_WEBSITE',
+      title: 'SIET College Web Platform & Institutional Portal',
+      subtitle: 'Modern responsive web portal engineered for institutional communication and student academic resources.',
+      description: 'Institutional responsive web portal developed for SIET college featuring modern layouts, semantic structure, department portals, and interactive course navigation.',
+      tech: ['JavaScript', 'HTML5', 'CSS3', 'Responsive Design'],
+      github: sietRepo?.html_url || 'https://github.com/TusharKau275/SIET_COLLEGE_WEBSITE',
+      live: null,
+      badge: 'WEB PLATFORM',
+      stars: sietRepo?.stargazers_count ?? 0,
+      forks: sietRepo?.forks_count ?? 0,
+      featured: true
+    },
+    {
+      id: 4,
+      name: 'Tushar-s-Portfolio',
+      title: 'Cloud-Native Developer Portfolio & API Architecture',
+      subtitle: 'Decoupled full-stack portfolio with Three.js graphics, Express REST API on Render, and Edge deployment.',
+      description: 'Production portfolio engineered with Three.js 3D interactive graphics, Node.js/Express backend on Render with rate-limit cached GitHub integration, and Vercel edge CDN routing.',
+      tech: ['Node.js', 'Express.js', 'Three.js', 'Render', 'Vercel', 'REST APIs'],
+      github: portfolioRepo?.html_url || 'https://github.com/TusharKau275/Tushar-s-Portfolio',
+      live: 'https://tushar-s-portfolio.onrender.com/',
+      badge: 'PRODUCTION APP',
+      stars: portfolioRepo?.stargazers_count ?? 0,
+      forks: portfolioRepo?.forks_count ?? 0,
+      featured: true
+    }
+  ];
+
+  return {
+    ...portfolioData,
+    avatar_url: u.avatar_url || 'https://avatars.githubusercontent.com/u/108011452?v=4',
+    githubStats: {
+      username: GITHUB_USERNAME,
+      public_repos: u.public_repos ?? 7,
+      followers: u.followers ?? 1,
+      following: u.following ?? 5,
+      company: u.company || '@gssoc',
+      location: u.location || 'India',
+      avatar_url: u.avatar_url || 'https://avatars.githubusercontent.com/u/108011452?v=4',
+      profile_url: u.html_url || `https://github.com/${GITHUB_USERNAME}`
+    },
+    linkedinProfile: {
+      name: 'Tushar Kaushik',
+      url: 'https://www.linkedin.com/in/tusharkaushik890/',
+      verifiedCertifications: portfolioData.certifications
+    },
+    projects: liveProjects
+  };
+}
 
 // ─── Health Check & API Routes ───────────────────────────────────────────────
 app.get(['/api/health', '/health'], (req, res) => {
@@ -165,16 +283,36 @@ app.get(['/api/health', '/health'], (req, res) => {
   });
 });
 
-app.get(['/api/portfolio', '/portfolio'], (req, res) => {
-  res.json({ success: true, data: portfolioData });
+app.get(['/api/portfolio', '/portfolio'], async (req, res) => {
+  try {
+    const live = await getLivePortfolio();
+    res.json({ success: true, data: live });
+  } catch (err) {
+    res.json({ success: true, data: portfolioData });
+  }
+});
+
+app.get(['/api/github', '/github'], async (req, res) => {
+  const gh = await fetchGitHubData();
+  res.json({
+    success: true,
+    user: gh.user,
+    repos: gh.repos,
+    cachedAt: new Date(githubCache.timestamp).toISOString()
+  });
 });
 
 app.get(['/api/skills', '/skills'], (req, res) => {
   res.json({ success: true, data: portfolioData.skills });
 });
 
-app.get(['/api/projects', '/projects'], (req, res) => {
-  res.json({ success: true, data: portfolioData.projects });
+app.get(['/api/projects', '/projects'], async (req, res) => {
+  try {
+    const live = await getLivePortfolio();
+    res.json({ success: true, data: live.projects });
+  } catch (err) {
+    res.json({ success: true, data: portfolioData.projects });
+  }
 });
 
 app.get(['/api/certifications', '/certifications'], (req, res) => {
@@ -191,6 +329,7 @@ app.use((req, res) => {
       endpoints: {
         health: '/api/health',
         portfolio: '/api/portfolio',
+        github: '/api/github',
         skills: '/api/skills',
         projects: '/api/projects',
         certifications: '/api/certifications'

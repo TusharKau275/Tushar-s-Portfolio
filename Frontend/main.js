@@ -24,9 +24,12 @@ if (metaBackendUrl) {
 
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+// When running on localhost, always talk to local API
+// In production, use metaBackendUrl if specified, or default to '/api'
 const API_BASE = window.__API_BASE__
-  || (metaBackendUrl || null)
-  || (isLocalhost && window.location.port !== '3000' ? 'http://localhost:3000/api' : '/api');
+  || (isLocalhost
+    ? (window.location.port === '3000' ? '/api' : 'http://localhost:3000/api')
+    : (metaBackendUrl || '/api'));
 
 let cachedProjects = [];
 
@@ -104,11 +107,25 @@ let cachedProjects = [];
 
   /* ── Resize ── */
   function onResize() {
-    const w = canvas.parentElement.clientWidth;
-    const h = canvas.parentElement.clientHeight;
+    const heroEl = document.getElementById('hero');
+    const w = heroEl ? heroEl.clientWidth : window.innerWidth;
+    const h = heroEl ? Math.min(heroEl.clientHeight || window.innerHeight, window.innerHeight) : window.innerHeight;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h;
+    camera.aspect = w / (h || 1);
     camera.updateProjectionMatrix();
+
+    // Position sphere on right side on desktop so it nicely balances hero text
+    if (w > 900) {
+      sphere.position.x = 0.85;
+      innerSphere.position.x = 0.85;
+      ring.position.x = 0.85;
+      particles.position.x = 0.35;
+    } else {
+      sphere.position.x = 0;
+      innerSphere.position.x = 0;
+      ring.position.x = 0;
+      particles.position.x = 0;
+    }
   }
   window.addEventListener('resize', onResize);
   onResize();
@@ -234,9 +251,11 @@ const SOCIAL_ICONS = {
 };
 
 const CERT_ICONS = {
-  gcp:    'https://cdn.simpleicons.org/googlecloud/4285F4',
-  aws:    'https://cdn.simpleicons.org/amazonaws/FF9900',
-  nodejs: 'https://cdn.simpleicons.org/nodedotjs/339933',
+  python:     'https://cdn.simpleicons.org/python/3776AB',
+  cplusplus:  'https://cdn.simpleicons.org/cplusplus/00599C',
+  gcp:        'https://cdn.simpleicons.org/googlecloud/4285F4',
+  aws:        'https://cdn.simpleicons.org/amazonaws/FF9900',
+  nodejs:     'https://cdn.simpleicons.org/nodedotjs/339933',
 };
 
 
@@ -271,6 +290,26 @@ async function loadPortfolio() {
     /* ── Certifications ── */
     if (Array.isArray(data.certifications) && data.certifications.length) {
       renderCerts(data.certifications);
+    }
+
+    /* ── Live GitHub & LinkedIn Stats ── */
+    if (data.avatar_url) {
+      const avatarEl = document.getElementById('about-avatar');
+      if (avatarEl) avatarEl.src = data.avatar_url;
+    }
+    if (data.githubStats) {
+      const reposEl = document.getElementById('fact-repos');
+      if (reposEl && data.githubStats.public_repos !== undefined) {
+        reposEl.textContent = data.githubStats.public_repos;
+      }
+      const communityEl = document.getElementById('fact-community');
+      if (communityEl && data.githubStats.company) {
+        communityEl.textContent = data.githubStats.company.replace('@', '');
+      }
+    }
+    if (Array.isArray(data.certifications)) {
+      const certsEl = document.getElementById('fact-certs');
+      if (certsEl) certsEl.textContent = data.certifications.length;
     }
 
     /* ── Footer socials ── */
@@ -522,12 +561,16 @@ function renderCerts(certs) {
   grid.innerHTML = certs.map(c => `
     <div class="cert-card">
       <div class="cert-card__icon">
-        <img src="${CERT_ICONS[c.icon] || CERT_ICONS.nodejs}" alt="${escHtml(c.issuer)} logo" width="26" height="26" />
+        <img src="${CERT_ICONS[c.icon] || CERT_ICONS.python}" alt="${escHtml(c.issuer)} logo" width="26" height="26" />
       </div>
       <div class="cert-card__body">
         <h3 class="cert-card__title">${escHtml(c.title)}</h3>
         <p class="cert-card__issuer">${escHtml(c.issuer)}</p>
-        <span class="cert-card__year">${escHtml(c.year)}</span>
+        <div class="cert-card__meta">
+          <span class="cert-card__year">${escHtml(c.year)}</span>
+          ${c.credentialId ? `<span class="cert-card__id">ID: <code>${escHtml(c.credentialId)}</code></span>` : ''}
+        </div>
+        ${c.skills ? `<p class="cert-card__skills"><span class="cert-card__skills-label">Skills:</span> ${escHtml(c.skills)}</p>` : ''}
       </div>
     </div>
   `).join('');
@@ -611,14 +654,65 @@ function renderFallback() {
         ]
       }
     },
-    { id:2, title:'Project Beta', description:'Cloud-native microservices on AWS with auto-scaling and CI/CD.', tech:['Python','AWS','PostgreSQL','Docker'], github:'#', live:null },
-    { id:3, title:'Project Gamma', description:'Full-stack app with TypeScript, WebSocket communication, and containerized deployment.', tech:['TypeScript','Node.js','MySQL','GCP'], github:'#', live:null },
+    {
+      id: 2,
+      name: 'FAKE-NEWS-DETECTION-ML-PROJECT',
+      title: 'Fake News Detection — Machine Learning NLP Classifier',
+      subtitle: 'Natural Language Processing and supervised classification pipeline for real-time disinformation filtering.',
+      description: 'Supervised NLP pipeline in Python utilizing TF-IDF vectorization and machine learning classifiers to detect, evaluate, and categorize fraudulent news articles and web propaganda.',
+      tech: ['Python', 'Scikit-Learn', 'NLP', 'Pandas', 'NumPy', 'TF-IDF'],
+      github: 'https://github.com/TusharKau275/FAKE-NEWS-DETECTION-ML-PROJECT',
+      live: null,
+      badge: 'AI / ML PROJECT',
+      featured: true
+    },
+    {
+      id: 3,
+      name: 'SIET_COLLEGE_WEBSITE',
+      title: 'SIET College Web Platform & Institutional Portal',
+      subtitle: 'Modern responsive web portal engineered for institutional communication and student academic resources.',
+      description: 'Institutional responsive web portal developed for SIET college featuring modern layouts, semantic structure, department portals, and interactive course navigation.',
+      tech: ['JavaScript', 'HTML5', 'CSS3', 'Responsive Design'],
+      github: 'https://github.com/TusharKau275/SIET_COLLEGE_WEBSITE',
+      live: null,
+      badge: 'WEB PLATFORM',
+      featured: true
+    },
+    {
+      id: 4,
+      name: 'Tushar-s-Portfolio',
+      title: 'Cloud-Native Developer Portfolio & API Architecture',
+      subtitle: 'Decoupled full-stack portfolio with Three.js graphics, Express REST API on Render, and Edge deployment.',
+      description: 'Production portfolio engineered with Three.js 3D interactive graphics, Node.js/Express backend on Render with rate-limit cached GitHub integration, and Vercel edge CDN routing.',
+      tech: ['Node.js', 'Express.js', 'Three.js', 'Render', 'Vercel', 'REST APIs'],
+      github: 'https://github.com/TusharKau275/Tushar-s-Portfolio',
+      live: 'https://tushar-s-portfolio.onrender.com/',
+      badge: 'PRODUCTION APP',
+      featured: true
+    }
   ]);
 
   renderCerts([
-    { id:1, title:'Google Cloud Professional', issuer:'Google Cloud', year:'2024', icon:'gcp' },
-    { id:2, title:'AWS Solutions Architect', issuer:'Amazon Web Services', year:'2023', icon:'aws' },
-    { id:3, title:'Node.js Application Developer', issuer:'OpenJS Foundation', year:'2023', icon:'nodejs' },
+    {
+      id: 1,
+      title: 'AI-ML Training',
+      issuer: 'Indian institute of computing and technology',
+      year: 'Issued Jul 2026',
+      credentialId: '',
+      credentialName: 'IICT AIML Training certificate',
+      skills: 'Python (Programming Language), Machine Learning',
+      icon: 'python'
+    },
+    {
+      id: 2,
+      title: 'CS107: C++ Programming',
+      issuer: 'Saylor University',
+      year: 'Issued Jan 2026',
+      credentialId: '4289665260TK',
+      credentialName: 'C++ skill certificate.pdf',
+      skills: 'C++',
+      icon: 'cplusplus'
+    }
   ]);
 
   renderSocials(
