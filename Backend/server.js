@@ -156,7 +156,7 @@ const portfolioData = {
 };
 
 // ─── Health Check & API Routes ───────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.status(200).json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -165,19 +165,19 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/portfolio', (req, res) => {
+app.get(['/api/portfolio', '/portfolio'], (req, res) => {
   res.json({ success: true, data: portfolioData });
 });
 
-app.get('/api/skills', (req, res) => {
+app.get(['/api/skills', '/skills'], (req, res) => {
   res.json({ success: true, data: portfolioData.skills });
 });
 
-app.get('/api/projects', (req, res) => {
+app.get(['/api/projects', '/projects'], (req, res) => {
   res.json({ success: true, data: portfolioData.projects });
 });
 
-app.get('/api/certifications', (req, res) => {
+app.get(['/api/certifications', '/certifications'], (req, res) => {
   res.json({ success: true, data: portfolioData.certifications });
 });
 

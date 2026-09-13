@@ -6,14 +6,27 @@
 'use strict';
 
 /* ─── CONFIG ──────────────────────────────────────────────── */
-const metaBackendUrl = document.querySelector('meta[name="backend-api-url"]')?.getAttribute('content')?.trim();
+let metaBackendUrl = document.querySelector('meta[name="backend-api-url"]')?.getAttribute('content')?.trim() || '';
+if (metaBackendUrl) {
+  metaBackendUrl = metaBackendUrl.replace(/\/+$/, '');
+  if (!metaBackendUrl.endsWith('/api')) {
+    metaBackendUrl += '/api';
+  }
+  try {
+    const parsed = new URL(metaBackendUrl, window.location.href);
+    if (parsed.origin === window.location.origin) {
+      metaBackendUrl = '/api';
+    }
+  } catch (e) {
+    // Ignore invalid URL
+  }
+}
+
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 const API_BASE = window.__API_BASE__
-  || (metaBackendUrl ? metaBackendUrl.replace(/\/$/, '') : null)
-  || (isLocalhost
-    ? (window.location.port === '3000' ? '/api' : 'http://localhost:3000/api')
-    : '/api');
+  || (metaBackendUrl || null)
+  || (isLocalhost && window.location.port !== '3000' ? 'http://localhost:3000/api' : '/api');
 
 let cachedProjects = [];
 
@@ -156,28 +169,43 @@ let cachedProjects = [];
 
 
 /* ─── INTERSECTION OBSERVER (scroll reveal) ───────────────── */
-(function initReveal() {
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const el = entry.target;
-        /* stagger delay for siblings */
-        const siblings = el.parentElement.querySelectorAll(`.${el.classList[0]}`);
-        let idx = 0;
-        siblings.forEach((s, i) => { if (s === el) idx = i; });
-        el.style.transitionDelay = `${idx * 70}ms`;
-        el.classList.add('visible');
-        /* trigger skill bar fill */
-        const bar = el.querySelector('.skill-pill__bar-fill');
-        if (bar) bar.style.width = bar.dataset.level + '%';
-        io.unobserve(el);
-      }
-    });
-  }, { threshold: 0.15 });
+let revealObserver = null;
 
-  document.querySelectorAll('.reveal-el, .skill-pill, .project-card, .cert-card')
-    .forEach(el => io.observe(el));
-})();
+function refreshRevealObserver() {
+  if (typeof IntersectionObserver === 'undefined') {
+    document.querySelectorAll('.reveal-el, .skill-pill, .project-card, .cert-card')
+      .forEach(el => {
+        el.classList.add('visible');
+        const bar = el.querySelector('.skill-pill__bar-fill');
+        if (bar && bar.dataset.level) bar.style.width = bar.dataset.level + '%';
+      });
+    return;
+  }
+
+  if (!revealObserver) {
+    revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const siblings = el.parentElement ? el.parentElement.querySelectorAll(`.${el.classList[0]}`) : [el];
+          let idx = 0;
+          siblings.forEach((s, i) => { if (s === el) idx = i; });
+          el.style.transitionDelay = `${idx * 60}ms`;
+          el.classList.add('visible');
+          const bar = el.querySelector('.skill-pill__bar-fill');
+          if (bar && bar.dataset.level) bar.style.width = bar.dataset.level + '%';
+          revealObserver.unobserve(el);
+        }
+      });
+    }, { threshold: 0.05, rootMargin: '40px' });
+  }
+
+  document.querySelectorAll('.reveal-el:not(.visible), .skill-pill:not(.visible), .project-card:not(.visible), .cert-card:not(.visible)')
+    .forEach(el => revealObserver.observe(el));
+}
+
+// Initial observer attachment for static elements
+refreshRevealObserver();
 
 
 /* ─── DATA RENDERING HELPERS ──────────────────────────────── */
@@ -214,57 +242,64 @@ const CERT_ICONS = {
 
 /* ─── DATA LOADER ─────────────────────────────────────────── */
 async function loadPortfolio() {
+  // 1. Immediately render default content so page sections are NEVER blank
+  renderFallback();
+  refreshRevealObserver();
+
+  // 2. Fetch fresh live data from API
   try {
-    const res  = await fetch(`${API_BASE}/portfolio`);
+    const res = await fetch(`${API_BASE}/portfolio`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    if (!json.success) throw new Error('API error');
+    if (!json.success || !json.data) throw new Error('API error or invalid format');
     const data = json.data;
 
     /* ── About ── */
     const aboutBody = document.getElementById('about-body');
-    if (aboutBody) aboutBody.textContent = data.about;
+    if (aboutBody && data.about) aboutBody.textContent = data.about;
 
     /* ── Skills ── */
-    renderSkills(data.skills);
+    if (Array.isArray(data.skills) && data.skills.length) {
+      renderSkills(data.skills);
+    }
 
     /* ── Projects ── */
-    renderProjects(data.projects);
+    if (Array.isArray(data.projects) && data.projects.length) {
+      renderProjects(data.projects);
+    }
 
     /* ── Certifications ── */
-    renderCerts(data.certifications);
+    if (Array.isArray(data.certifications) && data.certifications.length) {
+      renderCerts(data.certifications);
+    }
 
     /* ── Footer socials ── */
-    renderSocials(data.socials, data.email);
+    if (data.socials) {
+      renderSocials(data.socials, data.email);
+    }
 
     /* ── Update email links ── */
-    document.querySelectorAll('[href="mailto:tushar@example.com"]').forEach(el => {
-      el.href = `mailto:${data.email}`;
-    });
-    const footerEmail = document.getElementById('footer-email');
-    if (footerEmail) { footerEmail.href = `mailto:${data.email}`; footerEmail.textContent = data.email; }
+    if (data.email) {
+      document.querySelectorAll('[href="mailto:tushar@example.com"]').forEach(el => {
+        el.href = `mailto:${data.email}`;
+      });
+      const footerEmail = document.getElementById('footer-email');
+      if (footerEmail) { footerEmail.href = `mailto:${data.email}`; footerEmail.textContent = data.email; }
+    }
 
-    /* Trigger reveal observer on newly rendered elements */
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const el = entry.target;
-          const siblings = el.parentElement.querySelectorAll(`.${el.classList[0]}`);
-          let idx = 0;
-          siblings.forEach((s, i) => { if (s === el) idx = i; });
-          el.style.transitionDelay = `${idx * 70}ms`;
+    refreshRevealObserver();
+  } catch (err) {
+    console.info('Using bundled portfolio data (API unavailable or sleeping):', err.message || err);
+  } finally {
+    // Safety reveal: guarantees every card becomes visible even if observer is delayed or missed
+    setTimeout(() => {
+      document.querySelectorAll('.skill-pill:not(.visible), .project-card:not(.visible), .cert-card:not(.visible)')
+        .forEach(el => {
           el.classList.add('visible');
           const bar = el.querySelector('.skill-pill__bar-fill');
-          if (bar) bar.style.width = bar.dataset.level + '%';
-          io.unobserve(el);
-        }
-      });
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.skill-pill, .project-card, .cert-card')
-      .forEach(el => io.observe(el));
-
-  } catch (err) {
-    console.warn('Could not reach API, using fallback content.', err);
-    renderFallback();
+          if (bar && bar.dataset.level) bar.style.width = bar.dataset.level + '%';
+        });
+    }, 600);
   }
 }
 
@@ -586,7 +621,12 @@ function renderFallback() {
     { id:3, title:'Node.js Application Developer', issuer:'OpenJS Foundation', year:'2023', icon:'nodejs' },
   ]);
 
-  renderSocials({ github:'https://github.com/TusharKau275', linkedin:'https://www.linkedin.com/in/tusharkaushik890/', twitter:'https://twitter.com/tushar' });
+  renderSocials(
+    { github:'https://github.com/TusharKau275', linkedin:'https://www.linkedin.com/in/tusharkaushik890/', twitter:'https://twitter.com/tushar' },
+    'tusharkaushik275@gmail.com'
+  );
+
+  refreshRevealObserver();
 }
 
 /* ─── UTIL ────────────────────────────────────────────────── */
